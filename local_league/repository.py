@@ -188,6 +188,21 @@ class LocalLeagueRepository:
                 ),
             )
 
+    def list_seasons(self) -> List[Season]:
+        with self._connection() as conn:
+            rows = conn.execute("SELECT * FROM seasons ORDER BY starts_on").fetchall()
+        return [
+            Season(
+                id=_as_uuid(row["id"]),
+                title=row["title"],
+                starts_on=_parse_date(row["starts_on"]),
+                ends_on=_parse_date(row["ends_on"]),
+                created_at=_parse_datetime(row["created_at"]),
+                description=row["description"],
+            )
+            for row in rows
+        ]
+
     def create_season(
         self,
         title: str,
@@ -250,6 +265,32 @@ class LocalLeagueRepository:
             created_at=_parse_datetime(row["created_at"]),
             description=row["description"],
         )
+
+    def update_season(self, season: Season) -> Optional[Season]:
+        with self._connection() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE seasons
+                SET title = ?, starts_on = ?, ends_on = ?, description = ?
+                WHERE id = ?
+                """,
+                (
+                    season.title,
+                    _iso_date(season.starts_on),
+                    _iso_date(season.ends_on),
+                    season.description,
+                    str(season.id),
+                ),
+            )
+
+        if cursor.rowcount == 0:
+            return None
+        return season
+
+    def delete_season(self, season_id: uuid.UUID) -> bool:
+        with self._connection() as conn:
+            cursor = conn.execute("DELETE FROM seasons WHERE id = ?", (str(season_id),))
+        return cursor.rowcount > 0
 
     # Event operations --------------------------------------------------
     def add_event(self, event: EventDay) -> None:
